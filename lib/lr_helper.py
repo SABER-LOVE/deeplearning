@@ -5,6 +5,7 @@ import gzip
 import gc
 import math
 import numpy as np
+from sklearn import preprocessing
 
 
 # 1 装载数据
@@ -20,12 +21,15 @@ class lr_helper:
         global_index = 0  # f1_ls[2]
         question = f1_ls[0]
         ds = f1_ls[8:]  # str(f1_l).split('\t')  #
+        origin_data = f1_ls[0:8]  # str(f1_l).split('\t')  #
         ts = []
         index = -1
         for item in ds:
             index += 1
-
-            right = str(item).split(split_word)[1] == '1'
+            try:
+                right = str(item).split(split_word)[1] == '1'
+            except Exception as e1:
+                print(e1)
             if right:
                 right1 = [1, 0]
             else:
@@ -39,11 +43,13 @@ class lr_helper:
 
             t1 = (index, right1, relation, right, score1, score2, score3)
             ts.append(t1)
-        t1 = (global_index, question, ts, step, model)
+        t1 = (global_index, question, ts, step, model, origin_data)
         return t1
 
-    def __init__(self, f1='',
-                 f2='../data/nlpcc2016/8-logistics/logistics-2018-03-10.txt_bak.txt'):
+    def __init__(self, f1=''):
+
+        self.min_max_scaler = preprocessing.MinMaxScaler()
+
         self.all_datas = []
         # f1 = '../data/nlpcc2016/8-logistics/logistics-2018-03-10.txt_bak.txt'
         f1s = ct.file_read_all_lines_strip(f1)
@@ -57,27 +63,39 @@ class lr_helper:
                 need_skip = True
             if str(f1_l).__contains__('####'):
                 need_skip = True
+            # 改成不包含则跳过
             if str(f1_l).__contains__('@@@@@@'):
-                need_skip = True
+                f1_l = str(f1_l).replace('1@@@@@@','').replace('@@@@@@','')
+                # need_skip = True
 
-            if need_skip:
+            if need_skip:  # 实际没有跳过的
+                print(f1_l, 'skip')
                 continue
 
-            if index < config.cc_par('real_split_train_test_skip'):  # <= int(len(f1s)*0.8):
-                # if str(f1_l).__contains__('\tvalid\t'):
+            # if index < config.cc_par('real_split_train_test_skip'):  # <= int(len(f1s)*0.8):
+            m1 = False
+            if m1:
+                is_train = index < config.cc_par('real_split_train_test_skip')
+            else:
+                is_train = index < int(len(f1s)*0.8)
+
+            if is_train:
                 self.train_data.append(self.extract_line(f1_l))
             else:
                 self.test_data.append(self.extract_line(f1_l))
+                # 在这里除了下归一化
 
         print('init ok')
 
     def baseline(self, data):
         total = len(data)
         # shuffle_indices = np.random.permutation(np.arange(total))  # 打乱样本下标
-        rith_answer = 0
+
         right_index = 0
-        rith_answer = 0
-        right_index = 0
+        rith_answer1 = 0
+        rith_answer2 = 0
+        rith_answer3 = 0
+        rith_answer4 = 0
         for list_index in range(total):
             index = -1
             data_current = data[list_index]
@@ -85,15 +103,26 @@ class lr_helper:
             #     index += 1
             # 问题  Z分数 NN得分
             if int(data_current[2][0][1][0]) == 1:
-                rith_answer += 1
-            # else:
-            #     print(data_current)
+                rith_answer1 += 1
+            elif int(data_current[2][1][1][0]) == 1:
+                rith_answer2 += 1
+            elif int(data_current[2][2][1][0]) == 1:
+                rith_answer3 += 1
+            else:
+                rith_answer4 += 1
+                # else:
+                #     print(data_current)
 
-        return rith_answer / total
+        return [rith_answer1 / total, (rith_answer1 + rith_answer2) / total,
+                (rith_answer1 + rith_answer2 + rith_answer3) / total,
+                (rith_answer1 + rith_answer2 + rith_answer3 + rith_answer4) / total]
 
-    def batch_iter(self, data, batch_size):
+    def batch_iter(self, data, batch_size, mode='train', transform=False,random_index=True):
         total = len(data)
-        shuffle_indices = np.random.permutation(np.arange(total))  # 打乱样本下标
+        if random_index:
+            shuffle_indices = np.random.permutation(np.arange(total))  # 打乱样本下标
+        else:
+            shuffle_indices = np.arange(total)  # 打乱样本下标
 
         info1 = "q total:%d ; epohches-size:%s " % (total, len(data) // batch_size)
         ct.print(info1, 'info')
@@ -114,7 +143,7 @@ class lr_helper:
                 # t1 = (index, right1, score, relation,right,z_score)
                 y_new.append((float(ts[4]), float(ts[5]), float(ts[6])))  # 继续遍历
                 z_new.append(ts[1])
-                p_new.append(ts[4])
+                p_new.append(ts[2])
                 # ts
 
                 # 问题  Z分数 NN得分
@@ -134,7 +163,12 @@ class lr_helper:
             y_new.clear()
             z_new.clear()
             p_new.clear()
-            yield np.array(x_return), np.array(y_return), np.array(z_return), np.array(p_return), right_index
+            if transform:
+                y_return_new = self.min_max_scaler.fit_transform(y_return)
+            else:
+                y_return_new = np.array(y_return)
+            # yield np.array(x_return), np.array(y_return), np.array(y_return_new), np.array(p_return), right_index
+            yield np.array(x_return), y_return_new, np.array(z_return), np.array(p_return), right_index,data_current[5]
 
 
 if __name__ == "__main__":

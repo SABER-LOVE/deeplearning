@@ -1,3 +1,14 @@
+import platform
+print(platform.python_version())
+
+# try:
+#     a = 1
+#     b = a / 0
+# except (e1):
+#     print(e21)
+
+
+
 for i in range(0):
     print(i)
 

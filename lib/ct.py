@@ -8,7 +8,7 @@ import os
 import datetime
 import time
 import pickle
-
+import math
 
 class classObject:
     pass
@@ -621,6 +621,7 @@ class ct:
             .replace("【", "[").replace("】", "]") \
             .replace('，', ',').replace("”", '"').replace('“', '"') \
             .replace('）', ')').replace('（', '(').replace('／', '/') \
+            .replace('(','(').replace(')',')') \
             .replace('！','!').replace(" ", "").lower()
 
     @staticmethod
@@ -756,6 +757,13 @@ class ct:
     def get_key(st):
         return st.score
 
+    @staticmethod
+    def get_r_key(st):
+        return st.r_score
+
+    @staticmethod
+    def get_ner_key(st):
+        return st.ner_score
     # -------------------------------
     @staticmethod
     def get_key_matix(st):
@@ -821,12 +829,12 @@ class ct:
     # 自定义打印什么级别的
     @staticmethod
     def print(msg="", m="none"):
-
         timestamp = datetime.datetime.now().strftime("%H:%M:%S")
         ms = config.get_print_type()
         if m in ms:
             print("%s:\t%s" % (timestamp, msg))
-        ct.just_log4(m, "%s:\t%s" % (timestamp, msg))
+        if m not in ['maybe_possible','maybe','test_error','time']:
+            ct.just_log4(m, "%s:\t%s" % (timestamp, msg))
 
     @staticmethod
     def print_list(list1, m="none"):
@@ -869,6 +877,15 @@ class ct:
                     print("%s * 100" % (index / 10000))
                 lines.append(line.replace("\n", "").replace("\r", "").strip())
 
+        return lines
+
+    @staticmethod
+    def file_read_all_lines_strip_no_tips(file_name):
+        lines = []
+        with open(file_name, mode='r', encoding='utf-8') as read_file:
+            # with codecs.open(file_name, mode="r", encoding="utf-8") as read_file:
+            for line in read_file:
+                lines.append(line.replace("\n", "").replace("\r", "").strip())
         return lines
 
     @staticmethod
@@ -965,7 +982,7 @@ class ct:
     def file_wirte_list(path, list1):
         with open(path, mode='w', encoding='utf-8') as o1:
             for item in list1:
-                o1.write(item + '\n')
+                o1.write(str(item) + '\n')
 
     @staticmethod
     def list_safe_sub(list1, min1):
@@ -1236,14 +1253,23 @@ class ct:
     def clean_str_s(string):
 
         s1 = str(string).strip().strip('\n').strip('\r').replace(' ', '').lower()
+        s2 = ct.clean_str_zh2en(s1)  # 清理格式符合实体的符号。
+        return s2
+
+    # 清理实体名
+    @staticmethod
+    def clean_str_o(string):
+
+        s1 = str(string).strip().strip('\n').strip('\r').replace(' ', '').lower().replace('\xa0','')
         s2 = ct.clean_str_zh2en(s1)  # 符号转换
         return s2
 
-    # 清理问句，去除空格
+    # 清理O
     @staticmethod
     def clean_str_question(string):
         s1 = str(string).strip().strip('\n').strip('\r').replace(' ', '')\
             .lower().replace('\xa0','')
+        s1 = ct.clean_str_zh2en(s1)
         return s1
 
     @staticmethod
@@ -1267,15 +1293,37 @@ class ct:
     def reset_log_path_static():
         log_path = ct.log_path_static()
 
+    # k1 = key  k2 = value
     @staticmethod
     def dict_add(d1, k1, k2):
         if k1 in d1:
             s1 = d1[k1]
             s1.add(k2)
+            d1[k1] = s1
         else:
             s1 = set()
             s1.add(k2)
             d1[k1] = s1
+        return d1
+
+    # k1 = key  k2 = value
+    @staticmethod
+    def dict_add_tj(d1, k1, k2):
+        key = "%s@@@@%s"%(k1,k2)
+        if key in d1:
+            d1[key]+=1
+        else:
+            d1[key]=1
+        return d1
+
+    # k1 = key  k2 = value
+    @staticmethod
+    def dict_add_tj_w1(d1, k1):
+        key = k1
+        if key in d1:
+            d1[key]+=1
+        else:
+            d1[key]=1
         return d1
 
     # 同义词
@@ -1375,31 +1423,156 @@ class ct:
 
         return False
 
+    @staticmethod
+    def time_path():
+        # if out_dir!='':
+        #     return out_dir
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        return timestamp
+
+    @staticmethod
+    def get_shuffle_indices_train(total):
+        shuffle_indices = np.random.permutation(np.arange(total))  # 打乱样本下标
+        return shuffle_indices
+
+    @staticmethod
+    def convert_rs_to_words(rs):
+        """
+        关系集合转换为对应的字符集合
+        :param rs:
+        :return:
+        """
+        r_words = set()
+        for _r1 in rs:
+            for _w in _r1:
+                r_words.add(_w)
+        return list(r_words)
+    @staticmethod
+    def get_shuffle_indices_test(dh, step, train_part, model, train_step):
+        """
+
+        :param dh:
+        :param step:
+        :param train_part:
+        :param model: train valid test
+        :return:
+        """
+        if True: #train_part == 'relation':
+            if model == "valid":
+                if config.cc_compare('valid_model', 'only_error'):
+                    f1s = ct.file_read_all_lines_strip(config.cc_par('valid_only_error_valid'))
+                    id_list = [int(x) for x in f1s]
+                else:
+                    id_list = ct.get_static_id_list_debug(len(dh.train_question_list_index))
+            else:
+                if config.cc_compare('valid_model', 'only_error'):
+                    f1s = ct.file_read_all_lines_strip(config.cc_par('valid_only_error_test'))
+                    id_list = [int(x) for x in f1s]
+                else:
+                    id_list = ct.get_static_id_list_debug_test(len(dh.test_question_list_index))
+
+                    # id_list = ct.random_get_some_from_list(id_list, FLAGS.evaluate_batchsize)
+
+                    # id_list2 = [str(x) for x in id_list]
+                    # # step  训练模式    训练部分
+                    # ct.just_log(config.cc_par('combine_test'),
+                    #             '%s\t%s\t%s\t%s' % (train_step, model, train_part, '\t'.join(id_list2)))
+        # else:
+        #     f1s = ct.file_read_all_lines_strip(config.cc_par('combine_test'))
+        #     line = ''
+        #     exist = False
+        #     for l1 in f1s:
+        #         if str(l1).split('\t')[0] == str(train_step) \
+        #                 and str(l1).split('\t')[1] == model:
+        #             line = str(l1)
+        #             exist = True
+        #             break
+        #     if exist:
+        #         line_split = line.split('\t')
+        #         line_split = line_split[3:]
+        #         line_split = [int(x) for x in line_split]
+        #         id_list = np.array(line_split)
+        #         ct.print('get_shuffle_indices_test exist %s %s ' % (train_step, model), 'shuffle_indices_test')
+        #     else:  # 不存在就自己写
+        #         if model == "valid":
+        #             id_list = ct.get_static_id_list_debug(len(dh.train_question_list_index))
+        #         else:
+        #             id_list = ct.get_static_id_list_debug_test(len(dh.test_question_list_index))
+        #
+        #         id_list = ct.random_get_some_from_list(id_list, FLAGS.evaluate_batchsize)
+        #         ct.print('get_shuffle_indices_test not exist %s ' % train_step, 'shuffle_indices_test')
+
+        return id_list
+
+    @staticmethod
+    def generate_counter():
+        CNT = [0]
+
+        def add_one():
+            CNT[0] = CNT[0] + 1
+            return CNT[0]
+
+        return add_one
+    @staticmethod
+    def filter_limit_len(list1,min_len):
+        return list(filter(lambda x: len(x)<min_len , list1))
+
+    @staticmethod
+    def yield_return(data,batch_size):
+
+        length = len(data)
+        geshu = math.ceil(length / batch_size)  # 向上取整
+
+        for i in range(geshu):
+            yield data[i * batch_size:(i + 1) * batch_size]
+
 
 log_path = ct.log_path_static()
 
+
 if __name__ == "__main__":
-    aa1 = ct.log_path_static()
-    print(aa1 + "\\log\\")
-    print(len('你知道国务院学位委员会、国家教育委员会关于整顿普通高等学校授予成人高等教育本科毕业生学士学位工作的通知是谁发布的吗？'))
-    # print(len('死亡日记1999年电影thevirginsuicides(1999film)'))
-    # c1 = ct.re_clean_question('请问一下谁知道♠要打印多少张，请问下？')
-    # c1 = re.sub('(♠)+','♠','11231♠♠♠1♠♠3♠')
-    # c1 = re.sub('(♠.*♠)+', '♠', '112aaa♠♠♠1♠♠3♠ggg')
-    print(ct.padding_answer('"“”【[【啊。.啊，,打的】【。a【`·43$#@3213 21 '))
-    c1 = ct.do_some_clean('大家1了解♠的♢吗？?')
-    print(c1)
-    # ct.test_read_entity_and_get_all_neg_relations_sq()
-    # ct.test_random_get_some_from_list()
-    # ct.test_read_entity_and_get_all_relations()
-    # ct.test_decode_all_relations()
-    # ct.test_nump_sort()
-    # ct.log3("1111")  # 测试日志 ok
-    # ct.test_decode_all_relations()
-    # ct.test_random_get_one_from_list()
-
-    # else:
-    # print(r1[r11_index].deep)
+    data = []
+    for step in range(10):
+        data.append(step)
+        print(step)
+    for i in  ct.yield_return(data,2):
+        print(i)
+    # print(len('//upload.wikimedia.org/wikipedia/zh/7/7d/%e9%9b%bb%e5%bd%b1%e5%8b%9d%e5%88%a9.jpg上海国际电影节宣传海报'))
+    # print(len('历元2456400.5(2013年4月18日更新)'))
+    # all_ps_ret = []
+    # all_os_ret = []
+    # all_ps= [1,2,3,5]
+    # num=5
+    # range_array = ct.random_get_some_from_list(all_ps,num)
+    # for i in range_array:
+    #     # all_ps_ret.append(all_ps[i])
+    #     # all_os_ret.append(all_ps[i])
+    #     print(i)
 
 
-    # print(relation_path_rs_all)
+    # pass
+    # print(1e-1)
+    # aa1 = ct.log_path_static()
+    # print(aa1 + "\\log\\")
+    # print(len('你知道国务院学位委员会、国家教育委员会关于整顿普通高等学校授予成人高等教育本科毕业生学士学位工作的通知是谁发布的吗？'))
+    # # print(len('死亡日记1999年电影thevirginsuicides(1999film)'))
+    # # c1 = ct.re_clean_question('请问一下谁知道♠要打印多少张，请问下？')
+    # # c1 = re.sub('(♠)+','♠','11231♠♠♠1♠♠3♠')
+    # # c1 = re.sub('(♠.*♠)+', '♠', '112aaa♠♠♠1♠♠3♠ggg')
+    # print(ct.padding_answer('"“”【[【啊。.啊，,打的】【。a【`·43$#@3213 21 '))
+    # c1 = ct.do_some_clean('大家1了解♠的♢吗？?')
+    # print(c1)
+    # # ct.test_read_entity_and_get_all_neg_relations_sq()
+    # # ct.test_random_get_some_from_list()
+    # # ct.test_read_entity_and_get_all_relations()
+    # # ct.test_decode_all_relations()
+    # # ct.test_nump_sort()
+    # # ct.log3("1111")  # 测试日志 ok
+    # # ct.test_decode_all_relations()
+    # # ct.test_random_get_one_from_list()
+    #
+    # # else:
+    # # print(r1[r11_index].deep)
+    #
+    #
+    # # print(relation_path_rs_all)

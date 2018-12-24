@@ -2,12 +2,80 @@ from lib.baike_helper import baike_helper, baike_test
 from lib.classification_helper import classification
 from lib.data_helper import DataClass
 from lib.config import config
+from lib.ct import ct
+from lib.pretreatment import pretreatment
 
 # 一键纠错
 if __name__ == '__main__':  #
     bkt = baike_test()
-    bkh = baike_helper()
+    bkh = baike_helper(config.cc_par('alias_dict'))
     cf = classification()
+
+    # -------------- 预处理 test 部分
+    if False:
+        pretreatment.re_write(f1='../data/nlpcc2016/10-test/nlpcc2018.kbqa.test',
+                              f2='../data/nlpcc2016/10-test/test.txt')
+    if False:
+        pretreatment.stat_all_space(f1='../data/nlpcc2016/10-test/test.txt')
+    # 重写别名指代
+    if False:
+        pretreatment.re_write_m2id(f1='../data/nlpcc2016/1-origin/nlpcc-iccpol-2016.kbqa.kb.mention2id',
+                                   f_out='../data/nlpcc2016/4-ner/extract_e/e1.dict.v2.txt')
+    # 将实体
+    if False:
+        bkh.statistics_subject_len(f_in='../data/nlpcc2016/4-ner/extract_e/e1.dict.v2.txt',
+                                   f_out='../data/nlpcc2016/4-ner/extract_e/e1.tj.v2-2.txt')
+
+    # 答案选择
+    if False:
+        dh = DataClass("cc")
+        s=r'F:\PycharmProjects\dl2\deeplearning\data\nlpcc2016\6-answer\select_100p\s.txt'
+        p = r'F:\PycharmProjects\dl2\deeplearning\data\nlpcc2016\6-answer\select_100p\p.txt'
+        dh.answer_select(f1_s=s,f2_r=p)
+        # 19:59:03:	right:13516 wrong:582  valid	acc:0.958718	p1:0.816383	r1:0.958718	f1:0.848968
+        # 19:59:03:	right:8587 wrong:708 	test	acc:0.923830	p1:0.825254	r1:0.923830	f1:0.848680
+        # 100P
+        # 17:49:22:	right:923 wrong:33  	valid	acc:0.965481	p1:0.618595	r1:0.965481	f1:0.674224
+        # 17:49:22:	right:575 wrong:77  	test	acc:0.881902	 p1:0.626368	r1:0.881902	f1:0.669615
+
+        #
+    # -------------- NER识别 （从句子中生成NER）
+
+    if False:
+        bkt.n_gram_math_all(f_in="../data/nlpcc2016/4-ner/debug/q.rdf.ms.re.v1.txt",
+                        f_out='../data/nlpcc2016/4-ner/debug/extract_entitys_all.txt',
+                        f3="../data/nlpcc2016/4-ner/debug/e1.tj.v2.txt", # 实体别名的长度统计的文档
+                        skip_no_space=False)
+    if False:
+        bkt.n_gram_math_all(f_in="../data/nlpcc2016/nlpcc-iccpol-2016.kbqa.training.testing-data-all.txt",
+                        f_out='../data/nlpcc2016/4-ner/extract_entitys_all.v2.txt',
+                        f3="../data/nlpcc2016/4-ner/extract_e/e1.tj.v2.txt", # 实体别名的长度统计的文档
+                        skip_no_space=False)
+    if False:
+        # 根据extract_entitys_all.txt 重写e1.tj.v2，仅保留出现在候选实体中的
+        bkt.rewrite_e1_tj(f1='../data/nlpcc2016/4-ner/extract_e/e1.dict.v2.txt',
+                          f2='../data/nlpcc2016/4-ner/extract_entitys_all.txt',
+                          f3='../data/nlpcc2016/4-ner/extract_e/e1.tj.simple.txt')
+    if False:  # 统计完重写输出 排序
+        bkt.file_tj(f1='../data/nlpcc2016/4-ner/extract_entitys_all.txt',  # 原始
+                    f_out='../data/nlpcc2016/4-ner/extract_entitys_all_sort.txt',
+                    record=True)
+
+    # ------------- 将NER的结果相关的KB全部抽取出来
+    if False:
+        # 补全字典 ，根据漏掉的key从基本的字典中补全
+        bkh.extract_kb_test2(f1='../data/nlpcc2016/6-answer/q.rdf.ms.re.v2.txt',
+                             f2='../data/nlpcc2016/4-ner/extract_e/e1.dict.txt',
+                             f3='../data/nlpcc2016/2-kb/kb.v1.txt',
+                             f_out='../data/nlpcc2016/10-test/kb-bu-4.txt',
+                             )
+
+    if False:
+        bkh.extract_kb_test( f1='../data/nlpcc2016/10-test/test_extract_entitys.txt',
+                        f2='../data/nlpcc2016/4-ner/extract_e/e1.tj.txt',
+                        f3='../data/nlpcc2016/2-kb/kb.v1.txt',
+                        f4='../data/nlpcc2016/10-test/kb-test.txt'
+                        )
 
     # -------------- 清理部分 NER部分
     if False:
@@ -45,7 +113,6 @@ if __name__ == '__main__':  #
                            f3='../data/nlpcc2016/6-answer/q.rdf.ms.re.v1.txt',
                            skip=14610)
     if False:
-
         # 重写extract_entitys_all_tj 过滤不存在的属性
         bkh.filter_not_exist_in_f11(f1='../data/nlpcc2016/4-ner/extract_e/e1.tj.txt',
                                     f2='../data/nlpcc2016/4-ner/extract_entitys_all_tj.v0.txt',
@@ -53,33 +120,63 @@ if __name__ == '__main__':  #
         # bkh.init_find_entity()
         # bkh.init_ner(f11)  # bkh.n_gram_dict[time] = word list
 
-    if True:
-        num = 99
+    if False:  #  skip=1086
+        time_str = ct.time_path()
+        num = 14
         filter_list1 = bkt.try_test_acc_of_m1(
+            #   q.rdf.ms.re.v1.txt
             f1='../data/nlpcc2016/6-answer/q.rdf.ms.re.v1.txt',
             f3='../data/nlpcc2016/4-ner/extract_entitys_all_tj.v1.txt',
             # extract_entitys_v3                extract_entitys_all
-            f2='../data/nlpcc2016/4-ner/demo2/q.rdf.txt.failed_v4.8_%d.txt' % num,
             use_cx=False, use_expect=False, acc_index=[num],
             get_math_subject=True,
             f6='../data/nlpcc2016/4-ner/extract_entitys_all.txt.statistics.txt',
-            f8='../data/nlpcc2016/4-ner/demo2/extract_entitys_all_tj.resort_%d.v4.8.txt' % num,
-            f9='../data/nlpcc2016/4-ner/demo2/q.rdf.ms.re.top_%d.v4.10.txt' % num,
-            f10='../data/nlpcc2016/4-ner/demo2/ner_%d.v4.10.txt' % num,
-            combine_idf=True,
-            cant_contains_others=False)
-        print('==================之前的任务============')
-        print('前99,get:23840   acc: 0.999748,total - skip=633 ')
-        print('备注：try_test_acc_of_m1 Top3 23706,0.977567 (不互相包含23725,97.8351%) ')
-        print('备注：TOP3 23706 0.993332 (不互相包含 前3,get:23706   acc: 0.994129 ')
+            f2='../data/nlpcc2016/4-ner/demo_20181030/q.rdf.txt.failed_v4.8_%d_%s.txt' % (num, time_str),
+            f8='../data/nlpcc2016/4-ner/demo_20181030/extract_entitys_all_tj.resort_%d_%s.v4.8.txt' % (num, time_str),
+            f9='../data/nlpcc2016/4-ner/demo_20181030/q.rdf.ms.re.top_%d_%s.v4.10.txt' % (num, time_str),
+            f10='../data/nlpcc2016/4-ner/demo_20181030/ner_%d_%s.v4.10.txt' % (num, time_str),
+            f13='../data/nlpcc2016/4-ner/extract_entitys_all_tj.v4.txt',
+            f12='../data/nlpcc2016/6-answer/q.rdf.ms.re.v2.1.txt',
+            combine_idf=False,
+            cant_contains_others=False,
+            test_top_1000=True,
+            is_test =False)
+    if False: # skip 669
+        time_str = ct.time_path()
+        num = 1
+        filter_list1 = bkt.try_test_acc_of_s(
+                #   q.rdf.ms.re.v1.txt
+                f1='../data/nlpcc2016/6-answer/q.rdf.ms.re.v1.txt',
+                f3='../data/nlpcc2016/4-ner/20180924_M2ID/extract_entitys_all.v1.txt',
+                f4='../data/nlpcc2016/4-ner/extract_e/e1.dict.v2.txt',
+                acc_index=[num],
+                f6='../data/nlpcc2016/4-ner/extract_entitys_all.txt.statistics.txt',
+                f2='../data/nlpcc2016/4-ner/demo_20180904/q.rdf.txt.failed_v4.8_%d_%s.txt' % (num, time_str),
+                f8='../data/nlpcc2016/4-ner/demo_20180904/extract_entitys_all_tj.resort_%d_%s.v4.8.txt' % (
+                num, time_str),
+                f9='../data/nlpcc2016/4-ner/demo_20180904/q.rdf.ms.re.top_%d_%s.v4.10.txt' % (num, time_str),
+                f10='../data/nlpcc2016/4-ner/demo_20180904/ner_%d_%s.v4.10.txt' % (num, time_str),
+                f13='../data/nlpcc2016/4-ner/20180924_M2ID/extract_entitys_all_tj.v4.txt',
+                f12='../data/nlpcc2016/4-ner/20180924_M2ID/q.rdf.ms.re.v4.txt',
+                combine_idf=False,
+                cant_contains_others=False,
+                test_top_1000=True,
+                is_test=False)
+        #print('==================之前的任务============')
+        #print('前99,get:23840   acc: 0.999748,total - skip=633 ')
+        #print('备注：try_test_acc_of_m1 Top3 23706,0.977567 (不互相包含23725,97.8351%) ')
+        #print('备注：TOP3 23706 0.993332 (不互相包含 前3,get:23706   acc: 0.994129 ')
+    # 这里需要LR_TRAIN一次
     if False:
+        # 这里回归一份新的extract_entitys_all_tj.resort_3.v4.8.txt,格式会变
         print('获取扩展的实体集合,并判断是否共有属性')
         bkh.expend_es_by_dict(f1='../data/nlpcc2016/3-questions/q.rdf.ms.re.v1.filter.txt',
                               f2='../data/nlpcc2016/4-ner/extract_e/e1.dict.txt',
-                              f3='../data/nlpcc2016/4-ner/extract_entitys_all_tj.resort_3.v4.8.txt',
-                              f4='../data/nlpcc2016/4-ner/extract_entitys_all_tj.resort_3.expend.v1.txt',
+                              f3='../data/nlpcc2016/4-ner/demo3/q.rdf.score.top_3_all_0.v4.10.txt',
+                              f4='../data/nlpcc2016/4-ner/result/q.rdf.score.expend.v1.txt',  # 输出
+                              f5='../data/nlpcc2016/4-ner/result/expend.v1.txt',  # 输出
                               record=True,
-                              compare=True)
+                              compare=False)
 
     # if False:
     #     # 合并 q.rdf.txt.math_s.txt ， q.rdf 到 q.rdf.m_s
@@ -93,18 +190,27 @@ if __name__ == '__main__':  #
     #                         f2='../data/nlpcc2016/3-questions/q.rdf.m_s.suggest.txt')
     # 重写rdf_extract_property_origin
     # C1.2.1
-    if False:
-        filter_list2 = cf.extract_property(f3='../data/nlpcc2016/6-answer/q.rdf.ms.re.v1.txt',
-                            f4='../data/nlpcc2016/3-questions/q.rdf.ms.re.v1.filter.txt',
-                            f_out='../data/nlpcc2016/5-class/rdf_extract_property_origin.txt',
-                            skip=0,
-                            skip_cant_match=True)
-        print('重写q.rdf.ms.re.v1.filter.txt和rdf_extract_property_origin.txt')
-        s1 = set(filter_list1) - set(filter_list2)
-        print("%s "%' '.join(s1))
 
-        s2 = set(filter_list2) - set(filter_list1)
-        print("%s "%' '.join(s2))
+    # --------------  问答
+    if False:
+        # 弃用
+        filter_list2 = cf.extract_property(f3='../data/nlpcc2016/6-answer/q.rdf.ms.re.v2.txt',
+                                           f4='../data/nlpcc2016/3-questions/q.rdf.ms.re.v2.filter.txt',
+                                           f_out='../data/nlpcc2016/5-class/rdf_extract_property_origin.txt',
+                                           skip=0,
+                                           skip_cant_match=True)
+        print('重写q.rdf.ms.re.v1.filter.txt')
+    if False:
+        # "rdf_extract_property_origin.txt"
+        filter_list3 = cf.extract_property2(f1='../data/nlpcc2016/6-answer/q.rdf.ms.re.v2.txt',
+                                           f_out='../data/nlpcc2016/5-class/rdf_extract_property_origin.v2.txt',
+                                           )
+        pass
+        # s1 = set(filter_list1) - set(filter_list2)
+        # print("filter_list1-filter_list2: %s "%' '.join(s1))
+        # 作者	30	0	75	212	1397	1511	1692	2969
+        # s2 = set(filter_list2) - set(filter_list1)
+        # print("%s "%' '.join(s2))
     if False:
         # 仅用于测试
         cf.extract_property(f3='../data/nlpcc2016/3-questions/q.rdf.ms.re.v1.filter.txt',
@@ -118,29 +224,133 @@ if __name__ == '__main__':  #
         # F0.1.3
         # bkh.init_spo(config.cc_par('kb')) # 加载全部
         bkh.extract_kb_possible(f1='../data/nlpcc2016/2-kb/kb.v1.txt',
-                                f2="../data/nlpcc2016/2-kb/kb-use.v1[20180408].txt",
+                                f2="../data/nlpcc2016/2-kb/kb-use.v1[20180908].txt",
                                 f3='../data/nlpcc2016/3-questions/q.rdf.ms.re.v1.filter.txt',
-                                f4='../data/nlpcc2016/4-ner/extract_entitys_all_tj.resort_3.expend.v1.txt')
+                                f4='../data/nlpcc2016/4-ner/extract_entitys_all_tj.v2.txt')
         print('根据答案抽取出精简的KB kb-use.v2.txt')
-    #     怪物(2014年李民基主演韩国电影)
+    # 怪物(2014年李民基主演韩国电影)
     # 符号(2009年松本人志执导日本电影)
     # 郑成功(1987年香港tvb电视剧)
 
     if False:
         bkh.clean_baike_kb_repeat(f1="../data/nlpcc2016/2-kb/kb-use.v2.txt",
                                   f2="../data/nlpcc2016/2-kb/kb-use.v3.txt")
-        print('替换指定属性')
+        print('替换指定属性 后缀1 2 3 4 ')
     # 重写q.txt        # 3 生成新的训练文件
     if False:
         dh = DataClass(mode="cc", run_type='init')
         dh.build_all_q_r_tuple(99999999999999,
                                99999999999999, is_record=True)
         print('重新生成训练文件q_neg_r_tuple.v1')
+
+    # ============================================================
+    # 竞争属性部分
+    # ============================================================
     # 重生成所有测试集的候选属性
+    # 1 构造KB中的可能的竞争子集合
     if False:
-        #  读取问题
-        cf.build_test_ps(f1='../data/nlpcc2016/3-questions/q.rdf.ms.re.v1.filter.txt',
-                         f2='../data/nlpcc2016/5-class/test_ps.v4.txt', skip=14610)
+        kb_path = config.cc_par('kb')
+        cf.build_competing_p_in_kb('../data/nlpcc2016/13-competing/competing_p_in_kb.v2.txt',
+                                   '../data/nlpcc2016/13-competing/competing_s_in_kb.v2.txt',
+                                   kb_path)
     if False:
-        cf.build_competing_ps(f1='../data/nlpcc2016/5-class/test_ps.v4.txt',
-                              f2='../data/nlpcc2016/5-class/competing_ps.v1.txt')
+        #  读取问题 train_test_ps  train_ps
+        f1 = config.cc_par('cc_q_path')
+        skip = config.cc_par('real_split_train_test_skip_v2')
+        cf.build_test_ps(f1=f1,
+                         f2='../data/nlpcc2016/13-competing/train_test_ps.v2.txt', skip=skip)
+
+    if False:
+        cf.build_competing_ps(f1='../data/nlpcc2016/13-competing/train_ps.v2.txt',
+                              f2='../data/nlpcc2016/13-competing/competing_ps.v1.txt',
+                              f3='../data/nlpcc2016/13-competing/competing_ps_tj.v2.txt')
+    # ============================================================
+    # 竞争属性部分 V2
+    # ============================================================
+    if False:
+        #  读取问题 train_test_ps  train_ps
+        f1 = config.cc_par('cc_q_path')
+        skip = config.cc_par('real_split_train_test_skip_v2')
+        cf.build_test_ps_v2(f1=f1,
+                         f2='../data/nlpcc2016/14-cp/train_test_ps.v2.txt', skip=skip)
+    if False:
+        cf.build_competing_ps_v2(f1='../data/nlpcc2016/14-cp/train_test_ps.v2.txt',
+                              f2='../data/nlpcc2016/14-cp/competing_ps_tt.v1.txt',
+                              f3='../data/nlpcc2016/14-cp/competing_ps_tj_tt.v2.txt')
+
+    # @1 查看train中的P_POS的P_NEG是否包含test中的P_NEG，如果不存在则列出来
+    if False:
+        cf.check_diff_train_test_ps(f1='../data/nlpcc2016/14-cp/competing_ps_tj.v2.txt',f0=config.cc_par('cc_q_path'),
+                            f2='../data/nlpcc2016/14-cp/competing_ps_tj_tt.v2.txt',f3='../data/nlpcc2016/14-cp/diff.txt')
+    # ============================================================
+    # 竞争属性部分 V3 找出基于别名alias的所有P_NEG
+    # ============================================================
+    if True:
+        kb_path = config.cc_par('kb')
+        cc_q = config.cc_par('cc_q_path')
+        #
+        cf.build_competing_p_in_kb_by_alias('../data/nlpcc2016/14-cp/v3/competing_p_in_kb.v3.txt',
+                                   '../data/nlpcc2016/14-cp/v3/competing_s_in_kb.v3.txt',
+                                   '../data/nlpcc2016/14-cp/v3/competing_ps_kb.v3.txt',
+                                   kb_path)
+    # if False:
+    #     cf.build_competing_ps_v3(f1='../data/nlpcc2016/14-cp/v3/competing_p_in_kb.v3.txt',
+    #                                  f2='../data/nlpcc2016/14-cp/v3/competing_ps_kb.v1.txt',
+    #                                   start_index=0)
+
+    # 检查所有的实体是否存在KV中
+    #
+    if False:
+        dh = DataClass("cc")
+        dh.check_spo()
+
+    # 输入一个问句输出对应的NER 前3
+    # 1 分词
+    if False:
+        print('加载别名词典:')
+        bkh = baike_helper()
+        bkt = baike_test()
+        bkh.stat_dict('../data/nlpcc2016/4-ner/extract_entitys_all.txt')
+        bkh.init_ner(f_in2='../data/nlpcc2016/4-ner/extract_e/e1.tj.txt')
+        print('input:')
+        line = '民生路有哪些结点?' # input()
+        res = bkt.ner_q(bkh,line)
+        ct.print(res)
+        # 排序
+        res2 = bkt.sort_sentence(res,bkh)
+        ct.print(res2)
+        # 实体抽取《》
+        list1_new = [baike_helper.entity_re_extract_one_repeat(ct.clean_str_zh2en(x)) for x in res2]
+        # 去掉重复
+        list1_new = ct.list_no_repeat(list1_new)  # 去掉重复
+        # 去掉包含
+        # 5.8.3 去掉词语包含试试 有一首歌叫	有一首歌	一首歌
+        if True:
+            # 能略微提高
+            list1_new_2 = []
+            for list1_new_word in list1_new:
+                if not ct.be_contains(list1_new_word, list1_new):
+                    list1_new_2.append(list1_new_word)
+            list1_new = list1_new_2
+        ct.print(list1_new)
+
+    # 使用jieba分词出实体
+    if False:
+        # 读取别名字典，然后将其按格式 名字 长度 n 输出
+        names = ct.file_read_all_lines_strip_no_tips(config.cc_par('alias_dict'))
+        alias = [str(x).split('\t')[0] for x in names]
+        # alias = list(sorted(alias,key=lambda x:len(x),reverse=True))
+        alias2 = ["%s %d n"%(ct.clean_str_s(str(x)),len(x)) for x in  alias]
+        path1 = '../word2vec-test/jieba_dict/dict.txt.big'
+        path2 = '../data/nlpcc2016/4-ner/extract_e/dict.txt.big'
+        ct.file_wirte_list(path1,alias2)
+        print('done')
+    print('done')
+
+
+
+
+
+
+
+
